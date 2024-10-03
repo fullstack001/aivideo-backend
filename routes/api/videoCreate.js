@@ -117,72 +117,45 @@ router.get("/get-backgrounds", async (req, res) => {
 
 router.post("/create-audio", async (req, res) => {
   const { voice, content } = req.body;
-  const maxCharsPerRequest = 500;
-  const audioUrls = [];
-  const audioFilePaths = [];
-
-  // Function to split text into chunks of max 500 characters
-  const splitTextIntoChunks = (text, maxLength) => {
-    const chunks = [];
-    let startIndex = 0;
-    while (startIndex < text.length) {
-      const chunk = text.slice(startIndex, startIndex + maxLength);
-      chunks.push(chunk);
-      startIndex += maxLength;
-    }
-    return chunks;
-  };
-
-  // Function to download an audio file and store it locally
-  const downloadAudioFile = async (url, index) => {
-    const filePath = path.resolve(__dirname, `audio_chunk_${index}.mp3`);
-    const response = await axios({
-      url,
-      method: "GET",
-      responseType: "stream",
-    });
-
-    return new Promise((resolve, reject) => {
-      const writer = fs.createWriteStream(filePath);
-      response.data.pipe(writer);
-      writer.on("finish", () => resolve(filePath));
-      writer.on("error", reject);
-    });
-  };
-
-  // Split the content into chunks
-  const contentChunks = splitTextIntoChunks(content, maxCharsPerRequest);
+  console.log(voice, content);
 
   try {
-    // Loop through each chunk and send a request to the Lovo API
-    for (const [index, chunk] of contentChunks.entries()) {
-      const options = {
-        method: "POST",
-        url: "https://api.genny.lovo.ai/api/v1/tts/sync",
-        headers: {
-          "x-api-key": lovoKey,
-          accept: "application/json",
-          "content-type": "application/json",
-        },
-        data: {
-          speed: 1,
-          speaker: voice.id,
-          text: chunk, // Send each chunk
-          speakerStyle: voice.speakerStyles.id, // Use speakerStyle if available
-        },
-      };
+    const options = {
+      method: "POST",
+      url: "https://api.genny.lovo.ai/api/v1/tts/sync",
+      headers: {
+        "x-api-key": lovoKey,
+        accept: "application/json",
+        "content-type": "application/json",
+      },
+      data: {
+        speed: 1,
+        speaker: voice.id,
+        text: content,
+        speakerStyle: voice.speakerStyles.id,
+      },
+    };
 
-      // Make the API request for the current chunk
-      const response = await axios.request(options);
-      console.log(response.data);
+    const response = await axios.request(options);
+    console.log(response.data);
 
-      // Add the audio URL to the array
-      const audioUrl = response.data.data[0].urls[0];
-      audioUrls.push(audioUrl);
+    const audioUrl = response.data.data[0].urls[0];
+    res.json({ audioUrl });
+  } catch (error) {
+    console.error(error);
+    res.status(500).send("Server error");
+  }
+});
 
-      // Download the audio file and store the local file path
-      const audioFilePath = await downloadAudioFile(audioUrl, index);
-      audioFilePaths.push(audioFilePath);
+router.post("/combine-audio", async (req, res) => {
+  const { audioUrls } = req.body;
+  const audioFilePaths = [];
+
+  try {
+    // Download audio files
+    for (const [index, url] of audioUrls.entries()) {
+      const filePath = await downloadAudioFile(url, index);
+      audioFilePaths.push(filePath);
     }
 
     // Generate a unique file name
@@ -199,9 +172,7 @@ router.post("/create-audio", async (req, res) => {
     // Concatenate the files and output a combined audio file
     ffmpegCommand
       .on("end", () => {
-        // Once concatenation is complete, return the unique file name
         res.json({ audioUrl: uniqueFileName });
-
         // Clean up by deleting the temporary audio files
         audioFilePaths.forEach((filePath) => fs.unlinkSync(filePath));
       })
@@ -215,6 +186,23 @@ router.post("/create-audio", async (req, res) => {
     res.status(500).send("Server error");
   }
 });
+
+// Helper function to download audio file
+const downloadAudioFile = async (url, index) => {
+  const filePath = path.resolve(__dirname, `${Date.now()}_${index}.mp3`);
+  const response = await axios({
+    url,
+    method: "GET",
+    responseType: "stream",
+  });
+
+  return new Promise((resolve, reject) => {
+    const writer = fs.createWriteStream(filePath);
+    response.data.pipe(writer);
+    writer.on("finish", () => resolve(filePath));
+    writer.on("error", reject);
+  });
+};
 
 router.post("/create-video", async (req, res) => {
   const { avatar, content, background, language, voice } = req.body;
