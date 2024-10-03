@@ -23,7 +23,7 @@ dotenv.config();
 
 const app = express();
 const server = http.createServer(app);
-server.timeout = 300000;
+server.timeout = 1000000;
 
 export const io = new Server(server, {
   cors: {
