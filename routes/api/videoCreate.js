@@ -159,7 +159,7 @@ router.post("/combine-audio", async (req, res) => {
     }
 
     // Generate a unique file name
-    const uniqueFileName = `combined_audio_${uuidv4()}.mp3`;
+    const uniqueFileName = `combined_audio_${uuidv4()}.wav`;
     const outputFilePath = path.resolve(__dirname, uniqueFileName);
 
     const ffmpegCommand = ffmpeg();
@@ -169,7 +169,7 @@ router.post("/combine-audio", async (req, res) => {
       ffmpegCommand.input(filePath);
     });
 
-    // Concatenate the files and output a combined audio file
+    // Concatenate the files and output a combined audio file in WAV format
     ffmpegCommand
       .on("end", () => {
         res.json({ audioUrl: uniqueFileName });
@@ -180,7 +180,8 @@ router.post("/combine-audio", async (req, res) => {
         console.error("Error concatenating audio files:", err);
         res.status(500).send("Error processing audio");
       })
-      .mergeToFile(outputFilePath);
+      .mergeToFile(outputFilePath)
+      .outputOptions(["-acodec", "pcm_s16le"]); // Ensure WAV format
   } catch (error) {
     console.error(error);
     res.status(500).send("Server error");
@@ -189,7 +190,7 @@ router.post("/combine-audio", async (req, res) => {
 
 // Helper function to download audio file
 const downloadAudioFile = async (url, index) => {
-  const filePath = path.resolve(__dirname, `${Date.now()}_${index}.mp3`);
+  const filePath = path.resolve(__dirname, `${Date.now()}_${index}.wav`);
   const response = await axios({
     url,
     method: "GET",
