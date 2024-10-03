@@ -1,3 +1,4 @@
 /node_modules
 /dist
+/routes/api/*.mp3
 .env

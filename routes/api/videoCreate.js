@@ -6,8 +6,14 @@ const fs = require("fs");
 const path = require("path");
 const { v4: uuidv4 } = require("uuid");
 const ffmpeg = require("fluent-ffmpeg");
-ffmpeg.setFfmpegPath("C:/ffmpeg/bin/ffmpeg.exe"); // Path to ffmpeg
-ffmpeg.setFfprobePath("C:/ffmpeg/bin/ffprobe.exe"); // Path to ffprobe
+const os = require("os");
+
+// Conditional FFmpeg path setting
+if (os.platform() === "win32") {
+  ffmpeg.setFfmpegPath("C:/ffmpeg/bin/ffmpeg.exe");
+  ffmpeg.setFfprobePath("C:/ffmpeg/bin/ffprobe.exe");
+}
+// For Ubuntu, we don't need to set paths as it uses system-wide installation
 
 dotenv.config();
 
