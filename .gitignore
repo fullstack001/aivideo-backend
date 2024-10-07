@@ -2,3 +2,5 @@
 /dist
 /routes/api/*.mp3
 .env
+
+./client_secret.json
