@@ -35,6 +35,7 @@ export const io = new Server(server, {
 connectDB();
 createAdmin();
 
+app.set("io", io);
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ limit: "2000mb", extended: false }));
 app.use(cors({ origin: "*" }));
@@ -49,13 +50,16 @@ app.use("/api/checkrecords", checkRecords);
 app.use("/api/video-create", videoCreate);
 app.use("/api/get-audio", audio);
 
-app.get("/ReportFiles/:filename", (req, res) => {
-  const filename = req.params.filename;
-  res.sendFile(path.join(__dirname, "ReportFiles", filename));
-});
-
 app.get("/", (req, res) => {
   res.send(" API Running");
+});
+
+io.on("connection", (socket) => {
+  console.log("a user connected");
+
+  socket.on("disconnect", () => {
+    console.log("user disconnected");
+  });
 });
 
 const port = process.env.PORT || 5000;
