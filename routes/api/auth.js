@@ -93,6 +93,7 @@ router.post(
     }
 
     const { email, password } = req.body;
+    console.log(jwtSecret)
 
     try {
       let user = await User.findOne({ email });

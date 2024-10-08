@@ -2,6 +2,7 @@ import jwt from "jsonwebtoken";
 import jwtSecret from "../config/jwtSecret";
 
 export default function auth(req, res, next) {
+  console.log(jwtSecret)
   // Get token from header
   const token = req.headers.authorization;
 
@@ -14,6 +15,7 @@ export default function auth(req, res, next) {
   try {
     jwt.verify(token, jwtSecret, (error, decoded) => {
       if (error) {
+       
         return res.status(401).json({ msg: "Token is not valid" });
       } else {
         req.user = decoded.user;

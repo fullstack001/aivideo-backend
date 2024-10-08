@@ -1,3 +1,7 @@
-const jwtSecret = process.env.JWT_SECRET || "vin_check_secret";
+import dotenv from "dotenv";
+
+dotenv.config();
+
+const jwtSecret = process.env.JWT_SECRET || "multilanguage_video_secret";
 
 export default jwtSecret;
