@@ -83,20 +83,17 @@ router.post("/create-video", async (req, res) => {
     },
   };
 
-  console.log(options);
-  res.json({ success: "success" });
-
-  // try {
-  //   const response = await axios(options);
-  //   console.log(response.data);
-  //   res.json({ resultData: response.data });
-  // } catch (error) {
-  //   console.error("Error creating video:", error);
-  //   res.status(500).json({ error: "Error creating video" });
-  // }
+  try {
+    const response = await axios(options);
+    console.log(response.data);
+    res.json({ resultData: response.data });
+  } catch (error) {
+    console.error("Error creating video:", error);
+    res.status(500).json({ error: "Error creating video" });
+  }
 });
 
-router.get("/video-created", async (req, res) => {
+router.post("/video-created", async (req, res) => {
   console.log(req.body);
   res.json({ videoUrl: "https://www.google.com" });
 });
