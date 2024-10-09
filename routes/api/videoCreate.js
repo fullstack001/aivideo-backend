@@ -106,10 +106,9 @@ router.post("/create-video", auth, async (req, res) => {
       script: originContent,
       background: background?.src.original,
       avatar: avatar,
-      videoId: response.data.video_id,
+      video_id: response.data.video_id,
       videoName: response.data.video_name,
       status: response.data.video_status,
-      videoDuration: response.data.video_duration,
       language: language,
     });
     await video.save();
