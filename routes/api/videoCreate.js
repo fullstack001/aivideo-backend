@@ -16,6 +16,16 @@ const pexelKey = process.env.PEXEL_API_KEY;
 
 import Video from "../../models/Video";
 
+router.get("/user-videos", auth, async (req, res) => {
+  try {
+    const vidoes = await Video.find({ user: req.user.id });
+    res.json({ vidoes });
+  } catch (error) {
+    console.error("Error fetching user videos:", error);
+    res.status(500).json({ error: "Error fetching user videos" });
+  }
+});
+
 // /get-backgrounds endpoint to fetch backgrounds from Pexels
 router.get("/get-backgrounds", auth, async (req, res) => {
   const url =
