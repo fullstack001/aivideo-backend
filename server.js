@@ -19,23 +19,21 @@ import checkRecords from "./routes/api/checkRecords";
 import videoCreate from "./routes/api/videoCreate";
 import audio from "./routes/api/audio";
 
+import { initIO } from './socket';
+
+
+
 dotenv.config();
 
 const app = express();
 const server = http.createServer(app);
 server.timeout = 1000000;
 
-export const io = new Server(server, {
-  cors: {
-    origin: "*", // Allow all origins
-    methods: ["GET", "POST"],
-  },
-});
+initIO(server);
 
 connectDB();
 createAdmin();
 
-app.set("io", io);
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ limit: "2000mb", extended: false }));
 app.use(cors({ origin: "*" }));
@@ -52,14 +50,6 @@ app.use("/api/get-audio", audio);
 
 app.get("/", (req, res) => {
   res.send(" API Running");
-});
-
-io.on("connection", (socket) => {
-  console.log("a user connected");
-
-  socket.on("disconnect", () => {
-    console.log("user disconnected");
-  });
 });
 
 const port = process.env.PORT || 5000;

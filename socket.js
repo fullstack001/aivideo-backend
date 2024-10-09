@@ -1,18 +1,28 @@
-import { io } from "../../server";
+import { Server } from "socket.io";
 
-let clientsData = [];
-let socketss = [];
+let io;
 
-io.on("connection", (socket) => {
-  socketss.push(socket);
-  // Add client data when a client connects
-  clientsData = clientsData.filter((data) => data.socketId !== socket.id);
-  clientsData.push({ socketId: socket.id, data: null });
-
-  socket.on("disconnect", () => {
-    console.log("Client disconnected");
-    // Remove client data when a client disconnects
-    clientsData = clientsData.filter((data) => data.socketId != socket.id);
-    socketss = socketss.filter((data) => data.id != socket.id);
+export const initIO = (httpServer) => {
+  io = new Server(httpServer, {
+    cors: {
+      origin: process.env.FRONTEND_URL || "http://localhost:3000",
+      methods: ["GET", "POST"],
+    },
   });
-});
+
+  io.on("connection", (socket) => {
+    console.log("A client connected");
+    socket.on("disconnect", () => {
+      console.log("A client disconnected");
+    });
+  });
+
+  return io;
+};
+
+export const getIO = () => {
+  if (!io) {
+    throw new Error("Socket.io not initialized!");
+  }
+  return io;
+};

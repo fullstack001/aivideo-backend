@@ -6,7 +6,7 @@ import auth from "../../middleware/auth";
 import fs from "fs";
 import path from "path";
 // Add this line to import Socket.IO
-import { Server } from "socket.io";
+import { getIO } from '../../socket';
 
 dotenv.config();
 
@@ -113,14 +113,14 @@ router.post("/create-video", auth, async (req, res) => {
 router.post("/video-created", async (req, res) => {
   console.log(req.body); // Emit the video data to connected clients
   const videoData = req.body;
-  const video = await Video.findOne({ videoId: videoData.video_id });
+  const video = await Video.findOne({ video_id: videoData.video_id });
   video.status = videoData.status;
   video.download_url = videoData.download_url;
   video.stream_url = videoData.stream_url;
   await video.save();
 
-  const io = req.app.get("io");
-  io.emit(videoData.video_id, req.body);
+  const io = getIO();
+  io.emit("videoCreated", req.body);
 
   res.json({ message: "Video data received and sent to clients" });
 });
