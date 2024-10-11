@@ -3,8 +3,6 @@ import * as bodyParser from "body-parser";
 import cors from "cors";
 import dotenv from "dotenv";
 import http from "http";
-import { Server } from "socket.io";
-import path from "path";
 
 import connectDB from "./config/database";
 import createAdmin from "./config/createAdmin";
@@ -13,11 +11,9 @@ import auth from "./routes/api/auth";
 import question from "./routes/api/question";
 import payment from "./routes/api/payment";
 import admin from "./routes/api/admin";
-import report from "./routes/api/report";
 import credit from "./routes/api/credit";
-import checkRecords from "./routes/api/checkRecords";
 import videoCreate from "./routes/api/videoCreate";
-import audio from "./routes/api/audio";
+import videoManagement from "./routes/api/videoManagement";
 
 import { initIO } from './socket';
 
@@ -42,11 +38,9 @@ app.use("/api/auth", auth);
 app.use("/api/question", question);
 app.use("/api/payment", payment);
 app.use("/api/admin", admin);
-app.use("/api/report", report);
 app.use("/api/credit", credit);
-app.use("/api/checkrecords", checkRecords);
 app.use("/api/video-create", videoCreate);
-app.use("/api/get-audio", audio);
+app.use("/api/video-management", videoManagement);
 
 app.get("/", (req, res) => {
   res.send(" API Running");

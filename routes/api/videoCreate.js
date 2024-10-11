@@ -16,16 +16,6 @@ const pexelKey = process.env.PEXEL_API_KEY;
 
 import Video from "../../models/Video";
 
-router.get("/user-videos", auth, async (req, res) => {
-  try {
-    const vidoes = await Video.find({ user: req.user.id });
-    res.json({ vidoes });
-  } catch (error) {
-    console.error("Error fetching user videos:", error);
-    res.status(500).json({ error: "Error fetching user videos" });
-  }
-});
-
 // /get-backgrounds endpoint to fetch backgrounds from Pexels
 router.get("/get-backgrounds", auth, async (req, res) => {
   const url =
@@ -38,9 +28,12 @@ router.get("/get-backgrounds", auth, async (req, res) => {
 
   try {
     const response = await axios.get(url, options);
+    const backgrounds=response.data.photos.map(photo=>{
+      return photo.src.original
+    })
 
     // Axios automatically parses the JSON response, so no need to call .json() as with fetch
-    return res.status(200).json(response.data); // Send the avatar data back to the client
+    return res.status(200).json(backgrounds); // Send the avatar data back to the client
   } catch (error) {
     console.error("Error fetching avatars:", error);
 
@@ -79,10 +72,23 @@ router.post("/translate", auth, async (req, res) => {
 router.post("/create-video", auth, async (req, res) => {
   const { avatar, content, background, language, name, originContent } =
     req.body;
-  console.log(req.body);
 
   const tavusApiKey = process.env.TAVUS_API_KEY; // Make sure to add this to your .env file
   const API_URL = process.env.API_URL;
+
+  const creatingData = background ? {
+    background_url: background,
+    replica_id: avatar?.replica_id,
+    script: content,
+    video_name: name || `Video_${Date.now()}`, // You can customize this as needed
+    callback_url: `${API_URL}/api/video-create/video-created`,
+  } : {
+    replica_id: avatar?.replica_id,
+    script: content,
+    video_name: name || `Video_${Date.now()}`, // You can customize this as needed
+    callback_url: `${API_URL}/api/video-create/video-created`,
+  };
+
   const options = {
     method: "POST",
     url: "https://tavusapi.com/v2/videos",
@@ -90,13 +96,7 @@ router.post("/create-video", auth, async (req, res) => {
       "x-api-key": tavusApiKey,
       "Content-Type": "application/json",
     },
-    data: {
-      background_url: background?.src.original,
-      replica_id: avatar?.replica_id,
-      script: content,
-      video_name: name || `Video_${Date.now()}`, // You can customize this as needed
-      callback_url: `${API_URL}/api/video-create/video-created`,
-    },
+    data: creatingData,
   };
 
   try {
@@ -104,10 +104,10 @@ router.post("/create-video", auth, async (req, res) => {
     const video = new Video({
       user: req.user.id,
       script: originContent,
-      background: background?.src.original,
+      background: background || null,
       avatar: avatar,
       video_id: response.data.video_id,
-      videoName: response.data.video_name,
+      video_name: response.data.video_name,
       status: response.data.video_status,
       language: language,
     });
@@ -128,6 +128,12 @@ router.post("/video-created", async (req, res) => {
   video.download_url = videoData.download_url;
   video.stream_url = videoData.stream_url;
   await video.save();
+  const notification = new Notification({ 
+    user: video.user,
+    title: "Video Created",
+    description: `Your video ${video.video_name} has been created`,
+  });
+  await notification.save();
 
   const io = getIO();
   io.emit("videoCreated", req.body);
