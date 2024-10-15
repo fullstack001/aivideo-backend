@@ -15,10 +15,9 @@ import credit from "./routes/api/credit";
 import videoCreate from "./routes/api/videoCreate";
 import videoManagement from "./routes/api/videoManagement";
 import notification from "./routes/api/notification";
+import replica from "./routes/api/replica";
 
-import { initIO } from './socket';
-
-
+import { initIO } from "./socket";
 
 dotenv.config();
 
@@ -43,6 +42,7 @@ app.use("/api/credit", credit);
 app.use("/api/video-create", videoCreate);
 app.use("/api/video-management", videoManagement);
 app.use("/api/notification", notification);
+app.use("/api/replica", replica);
 app.get("/", (req, res) => {
   res.send(" API Running");
 });
