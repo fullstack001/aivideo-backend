@@ -3,8 +3,7 @@ import axios from "axios";
 import translate from "@iamtraction/google-translate";
 import dotenv from "dotenv";
 import auth from "../../middleware/auth";
-import fs from "fs";
-import path from "path";
+import {languageData} from "../../config/languageData.js";
 // Add this line to import Socket.IO
 import { getIO } from '../../socket';
 
@@ -15,6 +14,19 @@ const router = express.Router();
 const pexelKey = process.env.PEXEL_API_KEY;
 
 import Video from "../../models/Video";
+import Notification from "../../models/Notification";
+
+const tavusApiKey = process.env.TAVUS_API_KEY; // Make sure to add this to your .env file
+  const API_URL = process.env.API_URL;
+
+let vidoeCreateOption = {
+    method: "POST",
+    url: "https://tavusapi.com/v2/videos",
+    headers: {
+      "x-api-key": tavusApiKey,
+      "Content-Type": "application/json",
+    },
+  }
 
 // /get-backgrounds endpoint to fetch backgrounds from Pexels
 router.get("/get-backgrounds", auth, async (req, res) => {
@@ -71,36 +83,23 @@ router.post("/translate", auth, async (req, res) => {
 
 router.post("/create-video", auth, async (req, res) => {
   const { avatar, content, background, language, name, originContent } =
-    req.body;
+    req.body;  
 
-  const tavusApiKey = process.env.TAVUS_API_KEY; // Make sure to add this to your .env file
-  const API_URL = process.env.API_URL;
-
-  const creatingData = background ? {
-    background_url: background,
-    replica_id: avatar?.replica_id,
-    script: content,
-    video_name: name || `Video_${Date.now()}`, // You can customize this as needed
-    callback_url: `${API_URL}/api/video-create/video-created`,
-  } : {
+  const creatingData = {
     replica_id: avatar?.replica_id,
     script: content,
     video_name: name || `Video_${Date.now()}`, // You can customize this as needed
     callback_url: `${API_URL}/api/video-create/video-created`,
   };
 
-  const options = {
-    method: "POST",
-    url: "https://tavusapi.com/v2/videos",
-    headers: {
-      "x-api-key": tavusApiKey,
-      "Content-Type": "application/json",
-    },
-    data: creatingData,
-  };
+  if(background){
+    creatingData.background_url = background;
+  }
+
+  vidoeCreateOption ={...vidoeCreateOption, data: creatingData};
 
   try {
-    const response = await axios(options);
+    const response = await axios(vidoeCreateOption);
     const video = new Video({
       user: req.user.id,
       script: originContent,
@@ -119,15 +118,65 @@ router.post("/create-video", auth, async (req, res) => {
   }
 });
 
+router.post("/translate-video", auth, async (req, res) => {
+  const { id, targetLanguage } = req.body;
+  const video = await Video.findById(id);
+  const content = video.script;
+  
+  try {
+    const response = await translate(content, { from: "en", to: targetLanguage });
+    const translatedScript = response.text;
+    
+    // Remove existing language from video name and add new language
+    const baseVideoName = video.video_name.split('-')[0];
+    const newLanguageName = languageData.find(lang => lang.code === targetLanguage)?.name;
+    
+    const creatingData = {
+      replica_id: video.avatar?.replica_id,
+      script: translatedScript,
+      video_name: `${baseVideoName}-${newLanguageName}`,
+      callback_url: `${API_URL}/api/video-create/video-created`,
+    };
+
+    console.log(creatingData);
+
+    if (video.background) {
+      creatingData.background_url = video.background;
+    }
+
+    const videoCreateOption = { ...vidoeCreateOption, data: creatingData };
+    
+    const tavusResponse = await axios(videoCreateOption);
+    const translatedVideo = new Video({
+      user: req.user.id,
+      script: video.script,
+      background: video.background || null,
+      avatar: video.avatar,
+      video_id: tavusResponse.data.video_id,
+      video_name: tavusResponse.data.video_name,
+      status: tavusResponse.data.status,
+      language: targetLanguage,
+    });
+    
+    await translatedVideo.save();
+    res.json({ resultData: tavusResponse.data });
+  } catch (err) {
+    console.error("Error during translation or video creation:", err);
+    res.status(500).send("Translation or video creation error");
+  }
+});
+
 // Modify the /video-created endpoint
 router.post("/video-created", async (req, res) => {
   console.log(req.body); // Emit the video data to connected clients
   const videoData = req.body;
   const video = await Video.findOne({ video_id: videoData.video_id });
-  video.status = videoData.status;
-  video.download_url = videoData.download_url;
-  video.stream_url = videoData.stream_url;
-  await video.save();
+  if(video){
+    video.status = videoData.status||"ready";
+    video.download_url = videoData.download_url;
+    video.stream_url = videoData.stream_url;
+    await video.save();
+  }
   const notification = new Notification({ 
     user: video.user,
     title: "Video Created",

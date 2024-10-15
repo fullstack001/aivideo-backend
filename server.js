@@ -14,6 +14,7 @@ import admin from "./routes/api/admin";
 import credit from "./routes/api/credit";
 import videoCreate from "./routes/api/videoCreate";
 import videoManagement from "./routes/api/videoManagement";
+import notification from "./routes/api/notification";
 
 import { initIO } from './socket';
 
@@ -41,7 +42,7 @@ app.use("/api/admin", admin);
 app.use("/api/credit", credit);
 app.use("/api/video-create", videoCreate);
 app.use("/api/video-management", videoManagement);
-
+app.use("/api/notification", notification);
 app.get("/", (req, res) => {
   res.send(" API Running");
 });

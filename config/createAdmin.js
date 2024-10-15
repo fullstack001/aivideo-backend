@@ -2,17 +2,17 @@ import bcrypt from "bcryptjs";
 import User from "../models/User";
 
 const createAdmin = async () => {
-  const name = "VinCheck Admin";
+  const name = "Admin";
   const salt = await bcrypt.genSalt(10);
   const password = await bcrypt.hash("123456", salt);
   const email = "admin@admin.com";
-  const admin = await User.findOne({ name: name });
+  const admin = await User.findOne({ email });
   if (!admin) {
     const newUser = new User({
       name: name,
       email: email,
       password: password,
-      isAdmin: true,
+      role: "admin",
     });
     await newUser.save();
     console.log("Admin user added successfully.");

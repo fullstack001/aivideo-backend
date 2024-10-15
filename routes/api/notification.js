@@ -1,12 +1,16 @@
 import express from "express";
-import auth from "../../middleware/auth";
+import auth from "../../middleware/auth.js";
 
 const router = express.Router();
-import Notification from "../../models/Notification";
 
-router.get("/", auth, async (req, res) => {
-  const userId = req.user.userId;
-  const notifications = await Notification.find({ userId });
-  res.json(notifications);
+router.get("/get-notifications", auth, async (req, res) => {
+  try {
+    const notifications = await Notification.find({ user: req.user.id });
+    res.json({ notifications });
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send("Server Error");
+  }
 });
+
 export default router;
