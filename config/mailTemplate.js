@@ -57,28 +57,33 @@ const style = `<style>
                 }
             </style>`;
 
-// export function resetPasswordLink(token) {
-//   const resetLink = `https://streamdash.co/reset-password/${token}`;
-//   return `<!DOCTYPE html>
-//             <html>
-//             <head>
-//                 ${style}
-//             </head>
-//             <body>
-//                 <div class="email-container">
-//                     <p>Dear User,</p>
-//                     <p>We received a request to reset your streamdash account password. If you made this request, please click the link below to reset your password:</p>
-//                     <a href="${resetLink}" class="button">Reset Password</a>
-//                     <p>For your security, this link will expire in 24 hours. If you didn’t request a password reset, you can safely ignore this email—your account will remain secure.</p>
-//                     <p>If you need further assistance, don’t hesitate to contact us at support@streamdash.com.</p>
-//                     <p>Stay streaming!  <br>
-//                     The streamdash Team</p>
-//                     <p>---</p>
-//                     <p>**Note:** Never share your password with anyone. Always use a strong, unique password to keep your account secure.</p>
-//                 </div>
-//             </body>
-//             </html>`;
-// }
+export function resetPasswordLink(userName, token) {
+  const resetLink = `${process.env.CLIENT}/reset-password?token=${token}`;
+  return `<!DOCTYPE html>
+            <html>
+            <head>
+                ${style}
+            </head>
+            <body>
+                <div class="email-container">
+                    <p>Dear ${userName},</p>
+                    <p>We received a request to reset your  account password. If you made this request, please click the link below to reset your password:</p>
+                    <a href="${resetLink}" class="button">Reset Password</a>
+                    <p>For your security, this link will expire in 24 hours. If you didn’t request a password reset, you can safely ignore this email—your account will remain secure.</p>
+                    <ul>
+                     <li>AI-powered interactive avatars</li>
+                     <li>Automated social media and email campaigns</li>
+                     <li>Advanced analytics and insights</li>
+                    </ul>
+                    <p>If you have any questions, reach us at:</p>
+                    <p><strong>support@bestglobalal.com</strong></p>
+                    <p>We're excited to help you get started!</p>
+                    <p>Best regards,<br>
+                    The BestGlobalAl Team</p>
+                </div>
+            </body>
+            </html>`;
+}
 
 export function validationCodeContent(userName, code) {
   return `<!DOCTYPE html>

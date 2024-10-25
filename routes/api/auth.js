@@ -4,13 +4,16 @@ import crypto from "crypto";
 import { jwtDecode } from "jwt-decode";
 import jwt from "jsonwebtoken";
 import mg from "mailgun-js";
-import { OAuth2Client } from 'google-auth-library';
+import { OAuth2Client } from "google-auth-library";
 import { check, validationResult } from "express-validator";
-import moment from 'moment';
+import moment from "moment";
 
 import jwtSecret from "../../config/jwtSecret";
 import auth from "../../middleware/auth";
-import { validationCodeContent } from "../../config/mailTemplate";
+import {
+  validationCodeContent,
+  resetPasswordLink,
+} from "../../config/mailTemplate";
 import dotenv from "dotenv";
 dotenv.config();
 
@@ -51,7 +54,7 @@ router.post(
 
       // Prepare user template to be stored in DB
       const validationCode = `${Math.floor(100000 + Math.random() * 900000)}`;
-      const validationCodeExpiration = moment().add(10, 'minutes').toDate();
+      const validationCodeExpiration = moment().add(10, "minutes").toDate();
 
       user = new User({
         name,
@@ -83,10 +86,10 @@ router.post(
 
 router.post("/resend", async (req, res) => {
   const { email } = req.body;
-  
+
   try {
     const user = await User.findOne({ email });
-    
+
     if (!user) {
       return res.status(404).json({ msg: "User not found" });
     }
@@ -96,7 +99,7 @@ router.post("/resend", async (req, res) => {
     }
 
     const validationCode = `${Math.floor(100000 + Math.random() * 900000)}`;
-    const validationCodeExpiration = moment().add(10, 'minutes').toDate();
+    const validationCodeExpiration = moment().add(10, "minutes").toDate();
 
     user.validationCode = validationCode;
     user.validationCodeExpiration = validationCodeExpiration;
@@ -247,7 +250,7 @@ router.post(
     }
 
     const { email, password } = req.body;
-    console.log(jwtSecret)
+    console.log(jwtSecret);
 
     try {
       let user = await User.findOne({ email });
@@ -255,9 +258,9 @@ router.post(
         return res.status(400).json({ msg: "email" });
       }
 
-      if(!user.isActive){
+      if (!user.isActive) {
         const validationCode = `${Math.floor(100000 + Math.random() * 900000)}`;
-        const validationCodeExpiration = moment().add(10, 'minutes').toDate();
+        const validationCodeExpiration = moment().add(10, "minutes").toDate();
 
         // Update user with new validation code
         user.validationCode = validationCode;
@@ -381,25 +384,67 @@ router.post("/changepass/:id", auth, async (req, res) => {
   }
 });
 
+router.post("/request-reset", async (req, res) => {
+  const { email } = req.body;
+
+  try {
+    let user = await User.findOne({ email });
+    if (!user) {
+      return res.status(400).json({ msg: "No user found with this email" });
+    }
+
+    // Generate a reset token that expires in 1 hour
+    const resetToken = crypto.randomBytes(32).toString("hex");
+    const resetTokenExpire = Date.now() + 3600000; // 1 hour from now
+
+    // Store the token and expiration in the user's record
+    user.resetToken = resetToken;
+    user.resetTokenExpiration = resetTokenExpire;
+    await user.save();
+
+    // Create reset URL
+    const htmlContent = resetPasswordLink(user.name, resetToken);
+
+    // Mailgun email configuration
+    const data = {
+      from: process.env.MAILGUN_SENDER,
+      to: email,
+      subject: "Password Reset Request",
+      html: htmlContent,
+    };
+
+    // Send the email
+    mailgun.messages().send(data, (error, body) => {
+      if (error) {
+        return res.status(500).json({ msg: "Failed to send email" });
+      }
+      res.json({ msg: "Reset link sent to your email" });
+    });
+  } catch (error) {
+    console.error(error.message);
+    res.status(500).send("Server error");
+  }
+});
+
 // @route    POST api/auth/resetpass
 // @desc     reset user psssword
 // @access   Public
 
 router.post("/reset-password", async (req, res) => {
-  const { token, password } = req.body;
+  const { resetToken, newPassword } = req.body;
+  console.log(resetToken);
   try {
-    const decoded = jwtDecode(token);
-    if (Date.now() > decoded.exp * 1000) {
-      res.status(400).send({ msg: "Token has expired" });
+    const user = await User.findOne({ resetToken });
+    console.log(user);
+    if (!user) return res.status(400).send({ msg: "Invalid token" });
+    if (Date.now() > user.resetTokenExpiration) {
+      return res.status(400).send({ msg: "Token has expired" });
     }
-    const user = await User.findById(decoded.userId);
-    if (!user) {
-      return res
-        .status(400)
-        .send({ msg: "Invalid token or user does not exist" });
-    }
+
     const salt = await bcrypt.genSalt(10);
-    user.password = await bcrypt.hash(password, salt);
+    user.password = await bcrypt.hash(newPassword, salt);
+    user.resetToken = undefined;
+    user.resetTokenExpiration = undefined;
     await user.save();
     res.status(200).send("Password has been reset");
   } catch (error) {
