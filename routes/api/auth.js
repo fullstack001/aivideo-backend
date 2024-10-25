@@ -3,15 +3,23 @@ import bcrypt from "bcrypt";
 import crypto from "crypto";
 import { jwtDecode } from "jwt-decode";
 import jwt from "jsonwebtoken";
+import mg from "mailgun-js";
+import { OAuth2Client } from 'google-auth-library';
 import { check, validationResult } from "express-validator";
+import moment from 'moment';
+
 import jwtSecret from "../../config/jwtSecret";
-
 import auth from "../../middleware/auth";
-
+import { validationCodeContent } from "../../config/mailTemplate";
 import dotenv from "dotenv";
 dotenv.config();
 
 const router = express.Router();
+
+const mailgun = mg({
+  apiKey: process.env.MAILGUN_API_KEY,
+  domain: process.env.MAILGUN_DOMAIN,
+});
 
 import User from "../../models/User";
 
@@ -42,10 +50,15 @@ router.post(
       }
 
       // Prepare user template to be stored in DB
+      const validationCode = `${Math.floor(100000 + Math.random() * 900000)}`;
+      const validationCodeExpiration = moment().add(10, 'minutes').toDate();
+
       user = new User({
         name,
         email,
         password,
+        validationCode,
+        validationCodeExpiration,
       });
 
       // Encrypt the password
@@ -55,21 +68,11 @@ router.post(
       // Save the user registration details to DB
       await user.save();
 
-      //   res.send('User Registered');
+      // Send validation code to user's email
+      await sendValidationEmail(user.email, user.name, validationCode);
 
-      const payload = {
-        user: {
-          name: user.name,
-          id: user._id,
-          email: user.email,
-          isAdmin: user.isAdmin,
-          credit: user.credit,
-        },
-      };
-
-      jwt.sign(payload, jwtSecret, { expiresIn: "1 days" }, (err, token) => {
-        if (err) throw err;
-        res.json({ token });
+      res.status(200).json({
+        msg: "Signup successful. Verification code sent to your email.",
       });
     } catch (err) {
       console.error(err.message);
@@ -77,6 +80,157 @@ router.post(
     }
   }
 );
+
+router.post("/resend", async (req, res) => {
+  const { email } = req.body;
+  
+  try {
+    const user = await User.findOne({ email });
+    
+    if (!user) {
+      return res.status(404).json({ msg: "User not found" });
+    }
+
+    if (user.isActive) {
+      return res.status(400).json({ msg: "User is already verified" });
+    }
+
+    const validationCode = `${Math.floor(100000 + Math.random() * 900000)}`;
+    const validationCodeExpiration = moment().add(10, 'minutes').toDate();
+
+    user.validationCode = validationCode;
+    user.validationCodeExpiration = validationCodeExpiration;
+    await user.save();
+
+    await sendValidationEmail(user.email, user.name, validationCode);
+
+    res.status(200).json({ msg: "Verification code resent to your email" });
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send("Server error");
+  }
+});
+
+router.post("/verify", async (req, res) => {
+  const { email, validationCode } = req.body;
+
+  try {
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(404).json({ msg: "User not found" });
+    }
+
+    if (user.isActive) {
+      return res.status(400).json({ msg: "User is already verified" });
+    }
+
+    if (Number(user.validationCode) !== Number(validationCode)) {
+      return res.status(400).json({ msg: "Invalid code" });
+    }
+
+    if (moment().isAfter(user.validationCodeExpiration)) {
+      return res.status(400).json({ msg: "Verification code has expired" });
+    }
+
+    // Activate the user
+    user.isActive = true;
+    user.validationCode = undefined;
+    user.validationCodeExpiration = undefined;
+    await user.save();
+
+    const newUserData = await User.findOne({ email });
+
+    const payload = {
+      user: {
+        name: newUserData.name,
+        id: newUserData._id,
+        email: newUserData.email,
+        role: newUserData.role,
+      },
+    };
+
+    jwt.sign(payload, jwtSecret, { expiresIn: "1 days" }, (err, token) => {
+      if (err) throw err;
+      res.status(200).json({ token });
+    });
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send("Server error");
+  }
+});
+
+// Helper function to send validation email
+async function sendValidationEmail(email, name, validationCode) {
+  const emailData = {
+    from: process.env.MAILGUN_SENDER,
+    to: email,
+    subject: "Email Verification Code",
+    html: validationCodeContent(name, validationCode),
+  };
+
+  return new Promise((resolve, reject) => {
+    mailgun.messages().send(emailData, (error, body) => {
+      if (error) {
+        reject(error);
+      } else {
+        resolve(body);
+      }
+    });
+  });
+}
+
+//@route    POST api/auth/google
+//@desc     Register user with google
+//@access   Public
+
+router.post("/google", async (req, res) => {
+  const { credential } = req.body;
+  const client = new OAuth2Client(process.env.AUTH_GOOGLE_CLIENT_ID);
+
+  try {
+    const ticket = await client.verifyIdToken({
+      idToken: credential,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+
+    const payload = ticket.getPayload();
+    const { email, name, sub: googleId } = payload;
+
+    let user = await User.findOne({ email });
+
+    if (!user) {
+      // Create a new user if they don't exist
+      user = new User({
+        name,
+        email,
+        googleId,
+        password: crypto.randomBytes(16).toString("hex"), // Generate a random password
+      });
+      await user.save();
+    } else if (!user.googleId) {
+      // If user exists but doesn't have a googleId, update it
+      user.googleId = googleId;
+      await user.save();
+    }
+
+    const jwtPayload = {
+      user: {
+        name: user.name,
+        id: user._id,
+        email: user.email,
+        role: user.role,
+      },
+    };
+
+    jwt.sign(jwtPayload, jwtSecret, { expiresIn: "1 days" }, (err, token) => {
+      if (err) throw err;
+      res.json({ token });
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Server error");
+  }
+});
 
 // @route    POST api/auth/signin
 // @desc     Register user
@@ -99,6 +253,21 @@ router.post(
       let user = await User.findOne({ email });
       if (!user) {
         return res.status(400).json({ msg: "email" });
+      }
+
+      if(!user.isActive){
+        const validationCode = `${Math.floor(100000 + Math.random() * 900000)}`;
+        const validationCodeExpiration = moment().add(10, 'minutes').toDate();
+
+        // Update user with new validation code
+        user.validationCode = validationCode;
+        user.validationCodeExpiration = validationCodeExpiration;
+        await user.save();
+
+        // Send validation code to user's email
+        await sendValidationEmail(user.email, user.name, validationCode);
+
+        return res.status(403).json({ msg: "not_verified" });
       }
 
       const isMatch = await bcrypt.compare(password, user.password);

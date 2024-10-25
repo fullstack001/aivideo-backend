@@ -15,6 +15,15 @@ const UserSchema = new mongoose.Schema({
   },
   resetToken: String,
   resetTokenExpiration: Date,
+  validationCode: {
+    type: Number,
+    required: false, // Optional until user signs up
+  },
+  validationCodeExpiration: Date,
+  isActive: {
+    type: Boolean,
+    default: false, // By default, new users are inactive until they verify their email
+  },
   role: {
     type: String,
     default: "user",

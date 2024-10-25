@@ -2,6 +2,7 @@ import express from "express";
 import auth from "../../middleware/auth.js";
 
 const router = express.Router();
+import Notification from "../../models/Notification.js";
 
 router.get("/get-notifications", auth, async (req, res) => {
   try {
