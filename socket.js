@@ -7,6 +7,8 @@ export const initIO = (httpServer) => {
     cors: {
       origin: [process.env.CLIENT, "http://localhost:3000"],
       methods: ["GET", "POST"],
+      credentials: true,
+      allowedHeaders: ["Content-Type"],
     },
   });
 

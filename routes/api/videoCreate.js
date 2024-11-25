@@ -11,104 +11,67 @@ dotenv.config();
 
 const router = express.Router();
 
-const pexelKey = process.env.PEXEL_API_KEY;
+const baseUrl = "https://api.heygen.com";
+
+export const heygenApi = axios.create({
+  baseURL: baseUrl,
+  headers: {
+    'Content-Type': 'application/json',
+    "X-Api-Key": process.env.HEYGEN_APIKEY},
+});
 
 import Video from "../../models/Video";
 import Notification from "../../models/Notification";
 
-const tavusApiKey = process.env.TAVUS_API_KEY; // Make sure to add this to your .env file
-  const API_URL = process.env.API_URL;
+const API_URL = process.env.API_URL;
 
-let vidoeCreateOption = {
-    method: "POST",
-    url: "https://tavusapi.com/v2/videos",
-    headers: {
-      "x-api-key": tavusApiKey,
-      "Content-Type": "application/json",
-    },
-  }
-
-// /get-backgrounds endpoint to fetch backgrounds from Pexels
-router.get("/get-backgrounds", auth, async (req, res) => {
-  const url =
-    "https://api.pexels.com/v1/search?query=background&page=1&per_page=10";
-  const options = {
-    headers: {
-      Authorization: pexelKey, // Make sure your didKey is passed correctly
-    },
-  };
-
-  try {
-    const response = await axios.get(url, options);
-    const backgrounds=response.data.photos.map(photo=>{
-      return photo.src.original
-    })
-
-    // Axios automatically parses the JSON response, so no need to call .json() as with fetch
-    return res.status(200).json(backgrounds); // Send the avatar data back to the client
-  } catch (error) {
-    console.error("Error fetching avatars:", error);
-
-    if (error.response) {
-      return res
-        .status(error.response.status)
-        .json({ error: error.response.data });
-    } else if (error.request) {
-      return res
-        .status(500)
-        .json({ error: "No response received from server" });
-    } else {
-      return res.status(500).json({ error: "Internal server error" });
-    }
-  }
-});
 
 // /translate endpoint to handle translation requests
 router.post("/translate", auth, async (req, res) => {
   const { text, targetLanguage } = req.body;
 
-  translate(text, { from: "en", to: targetLanguage })
-    .then((response) => {
-      console.log(response.from.language.iso);
-      res.json({ translated: response.text });
-      //=> nl
-    })
-    .catch((err) => {
-      console.error("Error during translation:", err);
-      res.status(500).send("Translation error");
-    });
+  if (!text || !targetLanguage) {
+    return res.status(400).json({ error: "Text and targetLanguage are required" });
+  }
 
-  // Check if we already have valid access tokens, otherwise redirect to /auth
+  try {
+    // Translate without specifying the source language
+    const response = await translate(text, { to: targetLanguage });
+
+    res.json({
+      originalLanguage: response.from.language.iso, // Detected source language
+      translatedText: response.text,
+    });
+  } catch (err) {
+    console.error("Error during translation:", err);
+    res.status(500).send("Translation error");
+  }
 });
 
 router.post("/create-video", auth, async (req, res) => {
-  const { avatar, content, background, language, name, originContent } =
-    req.body;  
+  const { character , voice, background,  name } = req.body;  
 
   const creatingData = {
-    replica_id: avatar?.replica_id,
-    script: content,
-    video_name: name || `Video_${Date.now()}`, // You can customize this as needed
-    callback_url: `${API_URL}/api/video-create/video-created`,
+    title: name || `Video_${Date.now()}`, // You can customize this as needed
+    video_inputs: [
+      {
+        character: character,
+        voice: voice, }
+    ],
+    callback_id:"test123"
+    
   };
 
   if(background){
-    creatingData.background_url = background;
+    creatingData.video_inputs[0].background = background;
   }
 
-  vidoeCreateOption ={...vidoeCreateOption, data: creatingData};
 
   try {
-    const response = await axios(vidoeCreateOption);
+    const response = await heygenApi.post("/v2/video/generate", creatingData);
     const video = new Video({
       user: req.user.id,
-      script: originContent,
-      background: background || null,
-      avatar: avatar,
-      video_id: response.data.video_id,
-      video_name: response.data.video_name,
-      status: response.data.video_status,
-      language: language,
+      video_id:response.data.data.video_id
     });
     await video.save();
     res.json({ resultData: response.data });

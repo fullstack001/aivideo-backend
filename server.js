@@ -16,7 +16,8 @@ import videoCreate from "./routes/api/videoCreate";
 import videoManagement from "./routes/api/videoManagement";
 import notification from "./routes/api/notification";
 import replica from "./routes/api/replica";
-
+import conversation from "./routes/api/conversation";
+import persona from "./routes/api/persona";
 import { initIO } from "./socket";
 
 dotenv.config();
@@ -43,6 +44,8 @@ app.use("/api/video-create", videoCreate);
 app.use("/api/video-management", videoManagement);
 app.use("/api/notification", notification);
 app.use("/api/replica", replica);
+app.use("/api/conversation", conversation);
+app.use("/api/persona", persona);
 app.get("/", (req, res) => {
   res.send(" API Running");
 });
